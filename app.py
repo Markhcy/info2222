@@ -34,6 +34,10 @@ def index():
 def login():    
     return render_template("login.jinja")
 
+@app.route("/friends")
+def friends():
+    return render_template("friends.jinja")
+
 # handles a post request when the user clicks the log in button
 @app.route("/login/user", methods=["POST"])
 def login_user():
@@ -80,7 +84,7 @@ def page_not_found(_):
 def home():
     if request.args.get("username") is None:
         abort(404)
-    return render_template("home.jinja", username=request.args.get("username"))
+    return render_template("friends.jinja", username=request.args.get("username"))
 
 
 
