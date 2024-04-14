@@ -6,12 +6,30 @@
   <tr>
     <th style="background-color: yellow; ">Friends List</th>
   </tr>
-  <tr>
-    <td style="border: 1px solid black">Friend 1</td>
-  </tr>
-  <tr>
-    <td style="border: 1px solid black">Friend 2</td>
-  </tr>
+  {% for i in users %}
+    <tr>
+        <td style="border: 1px solid black">{{ i }}</td>
+    </tr>
+  {% endfor %}
 </table>
+
+
+<form action="{{url_for('home', username=username)}}" method="post">
+        <label for="enter_value">Add friend:</label><br>
+        <input type="text" name="enter_value">
+        <input type="submit" value="Submit">
+    </form>
+
+
+{% with messages = get_flashed_messages() %}
+    {% if messages %}
+        <ul>
+        {% for message in messages %}
+            <li>{{ message }}</li>
+        {% endfor %}
+        </ul>
+    {% endif %}
+{% endwith %}
+
 
 {% endblock %}

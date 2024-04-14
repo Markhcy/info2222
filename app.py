@@ -4,16 +4,19 @@ this is where you'll find all of the get/post request handlers
 the socket event handlers are inside of socket_routes.py
 '''
 
-from flask import Flask, render_template, request, abort, url_for
+from flask import Flask, render_template, request, abort, url_for, redirect, flash
 from flask_socketio import SocketIO
 import db
 import secrets
+import cherrypy
 
-# import logging
+import logging
 
 # this turns off Flask Logging, uncomment this to turn off Logging
 # log = logging.getLogger('werkzeug')
 # log.setLevel(logging.ERROR)
+
+
 
 app = Flask(__name__)
 
@@ -23,6 +26,9 @@ socketio = SocketIO(app)
 
 # don't remove this!!
 import socket_routes
+
+
+
 
 # index page
 @app.route("/")
@@ -79,14 +85,49 @@ def signup_user():
 def page_not_found(_):
     return render_template('404.jinja'), 404
 
-# home page, where the messaging app is
-@app.route("/home")
+# friends page, the initial landing page after logging in.
+user_list = db.get_all_user()
+friends_list = db.get_friends_list()
+
+@app.route("/home", methods=['GET', 'POST'])
 def home():
+    username = request.args.get("username")
+    if request.method == 'POST':
+        friend_name = request.form["enter_value"]
+        if search_friend(friend_name):
+            #check if they are already friends
+            for connections in friends_list:
+                friend1 = connections.person1
+                friend2 = connections.person2
+                if friend1 == username and friend2 == friend_name or friend2 == username and friend1 == friend_name:
+                    flash("Error: you are already friends!")
+                    return redirect(url_for('home', username=username))
+                else:
+                    db.add_friend(username, friend_name)
+        else:
+            flash("Error: friend does not exist!")
+            return redirect(url_for('home', username=username))
+
     if request.args.get("username") is None:
         abort(404)
-    return render_template("friends.jinja", username=request.args.get("username"))
+    return render_template("friends.jinja", username=request.args.get("username"), users=get_friend(username))
 
 
+def search_friend(friend):
+    for i in user_list:
+        user = i.username
+        if friend == user:
+            return True
+    return False
+
+def get_friend(user):
+    list_of_friends = []
+    for connections in friends_list:
+        if user == connections.person1:
+            list_of_friends.append(connections.person2)
+    print(list_of_friends)
+    return list_of_friends
 
 if __name__ == '__main__':
     socketio.run(app)
+    # cherrypy.quickstart(app)
