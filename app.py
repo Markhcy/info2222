@@ -8,6 +8,7 @@ from flask import Flask, render_template, request, abort, url_for, redirect, fla
 from flask_socketio import SocketIO
 import db
 import secrets
+from jinja2 import utils
 import cherrypy
 
 import logging
@@ -72,8 +73,11 @@ def signup():
 def signup_user():
     if not request.is_json:
         abort(404)
+    # XSS prevention by sanitising on server-side using built-in Jinja function
     username = request.json.get("username")
     password = request.json.get("password")
+    username = xss_prevention(username)
+    password = xss_prevention(password)
 
     if db.get_user(username) is None:
         db.insert_user(username, password)
@@ -127,6 +131,12 @@ def get_friend(user):
             list_of_friends.append(connections.person2)
     print(list_of_friends)
     return list_of_friends
+
+def xss_prevention(string):
+    badchar = '$*+.-/"<>'
+    for char in badchar:
+        string = string.replace(char, "")
+    return string
 
 if __name__ == '__main__':
     socketio.run(app)

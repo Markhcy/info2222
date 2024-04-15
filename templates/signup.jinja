@@ -11,8 +11,20 @@ Sign up page, pretty much the same as login.
     <p>Password</p>
     <input id="password" type="password"/>
     <button onclick="signup()">Sign up</button>
+    <p>Your password should include uppercase and lowercase letters, numbers, symbols, etc.</p>
 
     <script>
+        // this function prevents xss on the client-side by sanitising <, >, ,, ", and /
+        function xssPrevention(toOutput){
+            return toOutput.replace(/\&/g, '&amp;')
+                .replace(/\</g, '&lt;')
+                .replace(/\>/g, '&gt;')
+                .replace(/\"/g, '&quot;')
+                .replace(/\'/g, '&#x27;')
+                .replace(/\//g, '&#x2F;');
+        }
+
+
          function isValidURL(string) {
             if (string.length == 0) {
                 return false;
@@ -23,12 +35,64 @@ Sign up page, pretty much the same as login.
             return false;
         }
 
+        function isValidPassword(str) {
+            let points = 0;
+            // check password length
+            if (str.length > 10){
+                points+=1;
+            }
+            // check if uses Uppercase
+            for (let i = 0; i < str.length; i++){
+                if (str[i].toUpperCase() == str[i]){
+                    points+=1
+                    break;
+                }
+            }
+            // check if uses lowercase
+            for (let i = 0; i < str.length; i++){
+                if (str[i].toLowerCase() == str[i]){
+                    points+=1
+                    break;
+                }
+            }
+            // check if contains symbols
+            const symbols = ['!','(',')','-','.','?','[',']','_','`','~',';',':','#','@','$','%','^','&','*','+','=']
+
+            if (symbols.some(symbol => str.includes(symbol))) {
+                points+=1
+            }
+
+            if (points > 3){
+                return true;
+            }
+            else{
+                return false;
+            }
+        }
+
+
         // this function is identical to login(), see login.jinja
+
         async function signup() {
+            let username = xssPrevention($("#username").val())
+            let password = xssPrevention($("#password").val())
+
+            // validate if password is strong
+            if (!isValidPassword(password)){
+                alert('Password is too weak!')
+                return;
+            }
+
+            // encrypt password using sha256 on client-side
+
+            var x = sha256.create();
+            var y = x.update(password);
+            var hashedPassword = y.hex()
+
             let loginURL = "{{ url_for('signup_user') }}";
             let res = await axios.post(loginURL, {
-                username: $("#username").val(),
-                password: $("#password").val()
+                username: username,
+                password: hashedPassword
             });
             if (!isValidURL(res.data)) {
                 alert(res.data);
