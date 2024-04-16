@@ -4,7 +4,7 @@ this is where you'll find all of the get/post request handlers
 the socket event handlers are inside of socket_routes.py
 '''
 
-from flask import Flask, render_template, request, abort, url_for, redirect, flash
+from flask import Flask, render_template, request, abort, url_for, redirect, flash, jsonify,session
 from flask_socketio import SocketIO
 import db
 import secrets
@@ -122,6 +122,56 @@ def home():
 
     return render_template("friends.jinja", username=username, users=user_list, friends=friends_list)
 
+@app.route('/fetch-friend-requests')
+def fetch_friend_requests():
+    username = session.get("username")
+    if not username:
+        return jsonify({"error": "You must be logged in to view friend requests"}), 401
+
+    friend_requests = db.get_received_friend_requests(username)
+    requests_data = [{'fromUser': req.person1, 'id': req.connection_id} for req in friend_requests]
+    
+    return jsonify({"requests": requests_data}), 200
+
+
+
+@app.route('/send-friend-request', methods=['POST'])
+def send_friend_request():
+    if not request.is_json:
+        return jsonify({"message": "Invalid request"}), 400
+
+    data = request.get_json()
+    sender_username = data.get('sender')
+    receiver_username = data.get('receiver')
+
+    if not all([sender_username, receiver_username]):
+        return jsonify({"message": "Missing data"}), 400
+    
+    if db.are_already_friends_or_pending(sender_username, receiver_username):
+        return jsonify({"message": "Already friends or request pending"}), 409
+
+    if db.add_friend_request(sender_username, receiver_username):
+        return jsonify({"message": "Friend request sent"}), 200
+    else:
+        return jsonify({"message": "Could not send friend request"}), 500
+
+
+@app.route('/accept-friend-request/<int:request_id>', methods=['POST'])
+def accept_friend_request(request_id):
+    if db.accept_friend_request(request_id):
+        return jsonify({"message": "Friend request accepted"}), 200
+    else:
+        return jsonify({"message": "Could not accept friend request"}), 500
+
+@app.route('/reject-friend-request/<int:request_id>', methods=['POST'])
+def reject_friend_request(request_id):
+    if db.reject_friend_request(request_id):
+        return jsonify({"message": "Friend request rejected"}), 200
+    else:
+        return jsonify({"message": "Could not reject friend request"}), 500
+
+
+
 def are_already_friends_or_pending(user1, user2):
     existing = db.get_received_friend_requests(user2)
     for request in existing:
@@ -152,4 +202,3 @@ def xss_prevention(string):
 
 if __name__ == '__main__':
     socketio.run(app)
-
