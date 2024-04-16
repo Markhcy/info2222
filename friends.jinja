@@ -2,34 +2,9 @@
 
 {% block content %}
 
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-    const friendForm = document.getElementById('friend-form');
-    friendForm.addEventListener('submit', function(event) {
-        event.preventDefault();  // Prevent form from submitting the traditional way
-        const friendUsername = document.getElementById('enter_value').value;
-
-        fetch("{{ url_for('add_friend') }}", {  // Ensure this matches the Flask route that handles friend requests
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ friendUsername: friendUsername })
-        })
-        .then(response => response.json())
-        .then(data => {
-            alert("Response: " + data.message);  // Show an alert with the response message
-            if (data.success) {
-                const friendsList = document.getElementById('friends-list');
-                const newRow = friendsList.insertRow(-1);
-                const newCell = newRow.insertCell(0);
-                newCell.textContent = friendUsername;  // Add the new friend to the list dynamically
-            }
-        })
-        .catch(error => console.error('Error:', error));
-    });
-});
-</script>
+<div id="friend-requests-container">
+  <!-- Friend requests will be displayed here -->
+</div>
 
 <h2>Friends List</h2>
 <table id="friends-list" style="border: 1px solid black">
@@ -37,11 +12,9 @@ document.addEventListener("DOMContentLoaded", function() {
     <th style="background-color: yellow;">Friends</th>
   </tr>
   {% for friend in friends_list %}
-    {% if friend %} <!-- Check if the friend entry is not empty -->
     <tr>
       <td style="border: 1px solid black">{{ friend }}</td>
     </tr>
-    {% endif %}
   {% endfor %}
 </table>
 
@@ -61,5 +34,85 @@ document.addEventListener("DOMContentLoaded", function() {
     </ul>
   {% endif %}
 {% endwith %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Function to fetch and display friend requests
+    function fetchAndDisplayFriendRequests() {
+        fetch("{{ url_for('fetch_friend_requests') }}")
+        .then(response => response.json())
+        .then(data => {
+            const requestsContainer = document.getElementById('friend-requests-container');
+            if (data && data.requests) {
+                data.requests.forEach(request => {
+                    const requestElement = document.createElement('div');
+                    requestElement.textContent = request.fromUser;
+
+                    const acceptButton = document.createElement('button');
+                    acceptButton.textContent = 'Accept';
+                    acceptButton.addEventListener('click', function() {
+                        const acceptUrl = `/accept-friend-request/${request.id}`;
+                        fetch(acceptUrl, { method: 'POST' })
+                        .then(response => response.json())
+                        .then(data => {
+                            alert(data.message);
+                            requestElement.remove();  // Remove the request element from the DOM
+                        })
+                        .catch(error => console.error('Error:', error));
+                    });
+
+                    const declineButton = document.createElement('button');
+                    declineButton.textContent = 'Decline';
+                    declineButton.addEventListener('click', function() {
+                        const declineUrl = `/reject-friend-request/${request.id}`;
+                        fetch(declineUrl, { method: 'POST' })
+                        .then(response => response.json())
+                        .then(data => {
+                            alert(data.message);
+                            requestElement.remove();  // Remove the request element from the DOM
+                        })
+                        .catch(error => console.error('Error:', error));
+                    });
+
+                    requestElement.appendChild(acceptButton);
+                    requestElement.appendChild(declineButton);
+                    requestsContainer.appendChild(requestElement);
+                });
+            } else {
+                console.log('No friend requests found.');
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    // Call the function to fetch and display friend requests
+    fetchAndDisplayFriendRequests();
+
+    const friendForm = document.getElementById('friend-form');
+    friendForm.addEventListener('submit', function(event) {
+        event.preventDefault(); 
+        const friendUsername = document.getElementById('enter_value').value;
+        const senderUsername = '{{ username }}';
+        fetch("{{ url_for('send_friend_request') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ sender: senderUsername, receiver: friendUsername })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);  // Show a message to the user
+            if (data.success) {
+                const friendsList = document.getElementById('friends-list');
+                const newRow = friendsList.insertRow();
+                newRow.innerHTML = `<td>${friendUsername}</td>`;  // Add the new friend to the list
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    });
+});
+</script>
+
 
 {% endblock %}
