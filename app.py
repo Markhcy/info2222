@@ -42,14 +42,16 @@ def login():
 
 @app.route("/friends")
 def friends():
-    username = request.args.get("username")  # Assuming username is passed via query parameters
+    username = request.args.get("username")
     if not username:
         flash("Username is required to view friends.")
         return redirect(url_for('login'))
-    friends_list = db.get_friends_list(username)
+    
+    raw_friends_list = db.get_friends_list(username)
+    friends_list = [friend for friend in raw_friends_list if friend] 
     return render_template("friends.jinja", friends_list=friends_list, username=username)
 
-# handles a post request when the user clicks the log in button
+
 @app.route("/login/user", methods=["POST"])
 def login_user():
     if not request.is_json:
@@ -150,3 +152,4 @@ def xss_prevention(string):
 
 if __name__ == '__main__':
     socketio.run(app)
+
