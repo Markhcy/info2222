@@ -37,9 +37,11 @@ document.addEventListener("DOMContentLoaded", function() {
     <th style="background-color: yellow;">Friends</th>
   </tr>
   {% for friend in friends_list %}
+    {% if friend %} <!-- Check if the friend entry is not empty -->
     <tr>
       <td style="border: 1px solid black">{{ friend }}</td>
     </tr>
+    {% endif %}
   {% endfor %}
 </table>
 
@@ -61,4 +63,3 @@ document.addEventListener("DOMContentLoaded", function() {
 {% endwith %}
 
 {% endblock %}
-
