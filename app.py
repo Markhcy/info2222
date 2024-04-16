@@ -10,6 +10,7 @@ import db
 import secrets
 from jinja2 import utils
 import cherrypy
+from models import User, Friends, FriendshipStatus
 
 import logging
 
@@ -29,8 +30,6 @@ socketio = SocketIO(app)
 import socket_routes
 
 
-
-
 # index page
 @app.route("/")
 def index():
@@ -43,7 +42,12 @@ def login():
 
 @app.route("/friends")
 def friends():
-    return render_template("friends.jinja")
+    username = request.args.get("username")  # Assuming username is passed via query parameters
+    if not username:
+        flash("Username is required to view friends.")
+        return redirect(url_for('login'))
+    friends_list = db.get_friends_list(username)
+    return render_template("friends.jinja", friends_list=friends_list, username=username)
 
 # handles a post request when the user clicks the log in button
 @app.route("/login/user", methods=["POST"])
@@ -91,53 +95,56 @@ def page_not_found(_):
 
 # friends page, the initial landing page after logging in.
 user_list = db.get_all_user()
-friends_list = db.get_friends_list()
 
-@app.route("/home", methods=['GET', 'POST'])
+
 def home():
     username = request.args.get("username")
-    if request.method == 'POST':
-        friend_name = request.form["enter_value"]
-        if search_friend(friend_name):
-            #check if they are already friends
-            for connections in friends_list:
-                friend1 = connections.person1
-                friend2 = connections.person2
-                if friend1 == username and friend2 == friend_name or friend2 == username and friend1 == friend_name:
-                    flash("Error: you are already friends!")
-                    return redirect(url_for('home', username=username))
-                else:
-                    db.add_friend(username, friend_name)
-        else:
-            flash("Error: friend does not exist!")
-            return redirect(url_for('home', username=username))
-
-    if request.args.get("username") is None:
+    if not username:
         abort(404)
-    return render_template("friends.jinja", username=request.args.get("username"), users=get_friend(username))
+    
+    user_list = db.get_all_user()
+    friends_list = db.get_friends_list(username)
 
+    if request.method == 'POST':
+        friend_name = request.form.get("enter_value")
+        if db.get_user(friend_name):
+            if not db.are_already_friends_or_pending(username, friend_name):
+                db.add_friend_request(username, friend_name)
+                flash("Friend request sent!")
+            else:
+                flash("You are already friends or a friend request is pending.")
+        else:
+            flash("Friend does not exist!")
+
+    return render_template("home.jinja", username=username, users=user_list, friends=friends_list)
+
+def are_already_friends_or_pending(user1, user2):
+    existing = db.get_received_friend_requests(user2)
+    for request in existing:
+        if (request.person1 == user1 or request.person2 == user1) and \
+           (request.status == FriendshipStatus.PENDING or request.status == FriendshipStatus.ACCEPTED):
+            return True
+    return False
 
 def search_friend(friend):
+    user_list = db.get_all_user()  # Update to fetch user list dynamically
     for i in user_list:
-        user = i.username
-        if friend == user:
+        if friend == i.username:
             return True
     return False
 
 def get_friend(user):
+    friends_list = db.get_friends_list(user)  # Update to fetch friend list dynamically
     list_of_friends = []
-    for connections in friends_list:
-        if user == connections.person1:
-            list_of_friends.append(connections.person2)
-    print(list_of_friends)
+    for connection in friends_list:
+        list_of_friends.append(connection)
     return list_of_friends
 
 def xss_prevention(string):
-    badchar = '$*+.-/"<>'
-    for char in badchar:
+    bad_chars = '$*+.-/"<>'
+    for char in bad_chars:
         string = string.replace(char, "")
     return string
 
 if __name__ == '__main__':
     socketio.run(app)
-    # cherrypy.quickstart(app)

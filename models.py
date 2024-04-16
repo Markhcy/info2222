@@ -10,32 +10,37 @@ Prisma docs also looks so much better in comparison
 or use SQLite, if you're not into fancy ORMs (but be mindful of Injection attacks :) )
 '''
 
-from sqlalchemy import String, Integer
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import Column, String, Integer, ForeignKey, Enum
+from sqlalchemy.orm import relationship
+from sqlalchemy.ext.declarative import declarative_base
+import enum
 from typing import Dict
 
-# data models
-class Base(DeclarativeBase):
-    pass
+Base = declarative_base()
 
-# model to store user information
+class FriendshipStatus(enum.Enum):
+    PENDING = 'pending'
+    ACCEPTED = 'accepted'
+    REJECTED = 'rejected'
+
 class User(Base):
     __tablename__ = "user"
-    
-    # looks complicated but basically means
-    # I want a username column of type string,
-    # and I want this column to be my primary key
-    # then accessing john.username -> will give me some data of type string
-    # in other words we've mapped the username Python object property to an SQL column of type String 
-    username: Mapped[str] = mapped_column(String, primary_key=True)
-    password: Mapped[str] = mapped_column(String)
+    username = Column(String, primary_key=True)
+    password = Column(String)
+    sent_requests = relationship("Friends", foreign_keys="[Friends.person1]", back_populates="requester")
+    received_requests = relationship("Friends", foreign_keys="[Friends.person2]", back_populates="receiver")
 
 class Friends(Base):
-    __tablename__ = "friends_list"
+    __tablename__ = 'friends'
+    connection_id = Column(Integer, primary_key=True, autoincrement=True)
+    person1 = Column(String, ForeignKey('user.username'))
+    person2 = Column(String, ForeignKey('user.username'))
+    status = Column(Enum(FriendshipStatus))
 
-    connection_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    person1: Mapped[str] = mapped_column(String)
-    person2: Mapped[str] = mapped_column(String)
+    requester = relationship("User", foreign_keys=[person1], back_populates="sent_requests")
+    receiver = relationship("User", foreign_keys=[person2], back_populates="received_requests")
+
+
 
 # stateful counter used to generate the room id
 class Counter():

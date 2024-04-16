@@ -1,0 +1,64 @@
+{% extends 'base.jinja' %}
+
+{% block content %}
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const friendForm = document.getElementById('friend-form');
+    friendForm.addEventListener('submit', function(event) {
+        event.preventDefault();  // Prevent form from submitting the traditional way
+        const friendUsername = document.getElementById('enter_value').value;
+
+        fetch("{{ url_for('add_friend') }}", {  // Ensure this matches the Flask route that handles friend requests
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ friendUsername: friendUsername })
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert("Response: " + data.message);  // Show an alert with the response message
+            if (data.success) {
+                const friendsList = document.getElementById('friends-list');
+                const newRow = friendsList.insertRow(-1);
+                const newCell = newRow.insertCell(0);
+                newCell.textContent = friendUsername;  // Add the new friend to the list dynamically
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    });
+});
+</script>
+
+<h2>Friends List</h2>
+<table id="friends-list" style="border: 1px solid black">
+  <tr>
+    <th style="background-color: yellow;">Friends</th>
+  </tr>
+  {% for friend in friends_list %}
+    <tr>
+      <td style="border: 1px solid black">{{ friend }}</td>
+    </tr>
+  {% endfor %}
+</table>
+
+<h2>Add a New Friend</h2>
+<form id="friend-form">
+  <label for="enter_value">Friend's Username:</label><br>
+  <input type="text" id="enter_value" name="enter_value">
+  <input type="submit" value="Submit">
+</form>
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul>
+    {% for message in messages %}
+      <li>{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+
+{% endblock %}
+
