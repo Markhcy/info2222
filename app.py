@@ -83,6 +83,8 @@ def signup_user():
     username = xss_prevention(username)
     password = xss_prevention(password)
 
+    print(username)
+
     if db.get_user(username) is None:
         db.insert_user(username, password)
         return url_for('home', username=username)
@@ -96,7 +98,7 @@ def page_not_found(_):
 # friends page, the initial landing page after logging in.
 user_list = db.get_all_user()
 
-
+@app.route("/home", methods=['GET', 'POST'])
 def home():
     username = request.args.get("username")
     if not username:
@@ -116,7 +118,7 @@ def home():
         else:
             flash("Friend does not exist!")
 
-    return render_template("home.jinja", username=username, users=user_list, friends=friends_list)
+    return render_template("friends.jinja", username=username, users=user_list, friends=friends_list)
 
 def are_already_friends_or_pending(user1, user2):
     existing = db.get_received_friend_requests(user2)
