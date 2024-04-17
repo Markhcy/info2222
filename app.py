@@ -50,7 +50,9 @@ def friends():
     
     raw_friends_list = db.get_friends_list(username)
     friends_list = [friend for friend in raw_friends_list if friend] 
+    # print(friends_list)
     return render_template("friends.jinja", friends_list=friends_list, username=username)
+    # return url_for("friends", friends_list=friends_list, username=username)
 
 
 @app.route("/login/user", methods=["POST"])
@@ -127,8 +129,12 @@ def home():
 
     return render_template("friends.jinja", username=username, users=user_list, friends=friends_list)
 
+@app.route('/home/fetch_friend_requests', methods=['GET'])
 def fetch_friend_requests():
-    username = session.get("username")
+    # username = session.get("username")
+
+    username = request.args.get("username")
+    # print(username)
     if not username:
         return jsonify({"error": "You must be logged in to view friend requests"}), 401
 
@@ -137,10 +143,9 @@ def fetch_friend_requests():
     
     return jsonify({"requests": requests_data}), 200
 
-@app.route("/home/send_fr")
-def send_friend_request():
-    print(request.data)
 
+@app.route('/home/send_fr', methods=['POST'])
+def send_friend_request():
     if not request.is_json:
         return jsonify({"message": "Invalid request"}), 400
 
@@ -151,13 +156,18 @@ def send_friend_request():
     if not all([sender_username, receiver_username]):
         return jsonify({"message": "Missing data"}), 400
 
-    if db.are_already_friends_or_pending(sender_username, receiver_username):
-        return jsonify({"message": "Already friends or request pending"}), 409
+    try:
+        if are_already_friends_or_pending(sender_username, receiver_username):
+            return jsonify({"message": "Already friends or request pending"}), 409
+        # print(sender_username, receiver_username)
+        success = db.add_friend_request(sender_username, receiver_username)
+        if success:
+            return jsonify({"message": "Friend request sent"}), 200
+        else:
+            return jsonify({"message": "Receiver does not exist"}), 404  
+    except Exception as e:
+        return jsonify({"message": f"Internal server error: {str(e)}"}), 500
 
-    if db.add_friend_request(sender_username, receiver_username):
-        return jsonify({"message": "Friend request sent"}), 200
-    else:
-        return jsonify({"message": "Could not send friend request"}), 500
 
 @app.route('/accept-friend-request/<int:request_id>', methods=['POST'])
 def accept_friend_request(request_id):

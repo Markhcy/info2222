@@ -28,40 +28,108 @@
 <ul id="requests-received-list"></ul>
 
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const friendForm = document.getElementById('friend_form');
-        friendForm.addEventListener('submit', function(event) {
-            event.preventDefault();
-            const friendUsername = document.getElementById('enter_value').value;
-            const senderUsername = '{{ username }}';
+  function flush_received() {
+    const senderUsername = '{{ username }}';
+    $.ajax({
+      url: '/home/fetch_friend_requests',
+      data: { "username": senderUsername },
+      dataType: 'json',
+      type: 'GET',
+      success: function(res) {
+        console.log(res);
+        const requestsSentReceiver = document.getElementById('requests-received-list');
+        requestsSentReceiver.innerHTML = '';
+        res.requests.forEach(function(request) {
+          const receivedInList = document.createElement('li');
+          receivedInList.innerHTML = `<strong>${request.fromUser}</strong> (ID: ${request.id})`;
+          receivedInList.dataset.id = request.id;
 
-            const requestsSent = document.getElementById('requests-sent-list')
-            requestsSent.innerHTML = '';
-            const friend_in_list = document.createElement('li')
-            friend_in_list.textContent = friendUsername
-            requestsSent.appendChild(friend_in_list)
+          
+          const acceptBtn = document.createElement('button');
+          acceptBtn.textContent = 'accept';
+          const rejectBtn = document.createElement('button');
+          rejectBtn.textContent = 'reject';
 
-            const server_data = {
-                "sender": senderUsername,
-                "receiver": friendUsername
-            };
-            $.ajax({
-                url: '/home/send_fr',
-                data: JSON.stringify(server_data),
-                contentType: 'application/json',
-                dataType: 'json',
-                type: 'POST',
-                success: function(response) {
-                    console.log(response);
-                },
-                error: function(error) {
-                    console.log(error);
-                }
-            });
+          receivedInList.appendChild(acceptBtn);
+          receivedInList.appendChild(rejectBtn);
+          requestsSentReceiver.appendChild(receivedInList);
 
+          acceptBtn.addEventListener('click', function() {
+            handleFriendRequest(request.fromUser ,receivedInList.dataset.id, true);
+          });
+
+          rejectBtn.addEventListener('click', function() {
+            handleFriendRequest(request.fromUser, receivedInList.dataset.id, false);
+          });
         });
+      },
+      error: function(error) {
+        console.log(error);
+      }
     });
+  }
+
+  function handleFriendRequest(fromUser, received_id, accept) {
+  const url = (accept ? '/accept-friend-request/' : '/reject-friend-request/') + received_id;
+  $.ajax({
+    url: url,
+    type: 'POST',
+    success: function(response) {
+      console.log(accept ? 'Friend request accepted' : 'Friend request rejected', response);
+      if (accept) {
+        const senderUsername = '{{ username }}';
+        $.ajax({
+          url: '/friends',
+          data: { "username": senderUsername },
+          type: 'GET',
+          success: function(res) {
+            //console.log({{friends_list}})
+            window.open("/friends?username={{ username }}")
+          }
+        })
+      }
+    },
+    error: function(error) {
+      console.log('Error handling friend request', error);
+    }
+  });
+}
+
+  document.addEventListener("DOMContentLoaded", function() {
+    const friendForm = document.getElementById('friend_form');
+    friendForm.addEventListener('submit', function(event) {
+      event.preventDefault();
+      const friendUsername = document.getElementById('enter_value').value;
+      const senderUsername = '{{ username }}';
+      const requestsSent = document.getElementById('requests-sent-list');
+      requestsSent.innerHTML = '';
+      const friendInList = document.createElement('li');
+      friendInList.textContent = friendUsername;
+      requestsSent.appendChild(friendInList);
+      const serverData = { "sender": senderUsername, "receiver": friendUsername };
+      $.ajax({
+        url: '/home/send_fr',
+        data: JSON.stringify(serverData),
+        contentType: 'application/json',
+        dataType: 'json',
+        type: 'POST',
+        success: function(response) {
+          console.log(response);
+        },
+        error: function(error) {
+          console.log(error);
+        }
+      });
+    });
+
+    var t1 = window.setInterval(flush_received, 1000 * 5);
+  });
 </script>
 
 
 {% endblock %}
+
+
+
+
+
