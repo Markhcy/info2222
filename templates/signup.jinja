@@ -83,16 +83,10 @@ Sign up page, pretty much the same as login.
                 return;
             }
 
-            // encrypt password using sha256 on client-side
-
-            var x = sha256.create();
-            var y = x.update(password);
-            var hashedPassword = y.hex()
-
             let loginURL = "{{ url_for('signup_user') }}";
             let res = await axios.post(loginURL, {
                 username: username,
-                password: hashedPassword
+                password: password
             });
             if (!isValidURL(res.data)) {
                 alert(res.data);

@@ -11,6 +11,7 @@ import secrets
 from jinja2 import utils
 import cherrypy
 from models import User, Friends, FriendshipStatus
+from hashlib import sha256
 
 import logging
 
@@ -59,12 +60,14 @@ def login_user():
 
     username = request.json.get("username")
     password = request.json.get("password")
+    hashedPassword = (sha256(password.encode('utf-8')).hexdigest())
+
 
     user =  db.get_user(username)
     if user is None:
         return "Error: User does not exist!"
 
-    if user.password != password:
+    if user.password != hashedPassword:
         return "Error: Password does not match!"
 
     return url_for('home', username=request.json.get("username"))
@@ -85,11 +88,13 @@ def signup_user():
     username = xss_prevention(username)
     password = xss_prevention(password)
 
-    print(username)
+    # SHA256 hashing of password on server-side
+    hashedPassword = (sha256(password.encode('utf-8')).hexdigest())
+
 
     if db.get_user(username) is None:
-        db.insert_user(username, password)
-        return url_for('home', username=username)
+        db.insert_user(username, hashedPassword)
+        return url_for('login', username=username)
     return "Error: User already exists!"
 
 # handler when a "404" error happens
@@ -109,20 +114,19 @@ def home():
     user_list = db.get_all_user()
     friends_list = db.get_friends_list(username)
 
-    if request.method == 'POST':
-        friend_name = request.form.get("enter_value")
-        if db.get_user(friend_name):
-            if not db.are_already_friends_or_pending(username, friend_name):
-                db.add_friend_request(username, friend_name)
-                flash("Friend request sent!")
-            else:
-                flash("You are already friends or a friend request is pending.")
-        else:
-            flash("Friend does not exist!")
+    # if request.method == 'POST':
+    #     friend_name = request.form.get("enter_value")
+    #     if db.get_user(friend_name):
+    #         if not db.are_already_friends_or_pending(username, friend_name):
+    #             db.add_friend_request(username, friend_name)
+    #             flash("Friend request sent!")
+    #         else:
+    #             flash("You are already friends or a friend request is pending.")
+    #     else:
+    #         flash("Friend does not exist!")
 
     return render_template("friends.jinja", username=username, users=user_list, friends=friends_list)
 
-@app.route('/fetch-friend-requests')
 def fetch_friend_requests():
     username = session.get("username")
     if not username:
@@ -133,10 +137,10 @@ def fetch_friend_requests():
     
     return jsonify({"requests": requests_data}), 200
 
-
-
-@app.route('/send-friend-request', methods=['POST'])
+@app.route("/home/send_fr")
 def send_friend_request():
+    print(request.data)
+
     if not request.is_json:
         return jsonify({"message": "Invalid request"}), 400
 
@@ -146,7 +150,7 @@ def send_friend_request():
 
     if not all([sender_username, receiver_username]):
         return jsonify({"message": "Missing data"}), 400
-    
+
     if db.are_already_friends_or_pending(sender_username, receiver_username):
         return jsonify({"message": "Already friends or request pending"}), 409
 
@@ -155,13 +159,13 @@ def send_friend_request():
     else:
         return jsonify({"message": "Could not send friend request"}), 500
 
-
 @app.route('/accept-friend-request/<int:request_id>', methods=['POST'])
 def accept_friend_request(request_id):
     if db.accept_friend_request(request_id):
         return jsonify({"message": "Friend request accepted"}), 200
     else:
         return jsonify({"message": "Could not accept friend request"}), 500
+
 
 @app.route('/reject-friend-request/<int:request_id>', methods=['POST'])
 def reject_friend_request(request_id):

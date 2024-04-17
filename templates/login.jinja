@@ -48,17 +48,12 @@
             let username = xssPrevention($("#username").val())
             let password = xssPrevention($("#password").val())
 
-            // encrypt password using sha256 on client-side
-
-            var x = sha256.create();
-            var y = x.update(password);
-            var hashedPassword = y.hex()
 
             // axios post is a fancy way of posting a request to the server,
             // we pass in the username and password here
             let res = await axios.post(loginURL, {
                 username: username,
-                password: hashedPassword
+                password: password
             });
 
             // if the server sends in an error message, alert() the error message
