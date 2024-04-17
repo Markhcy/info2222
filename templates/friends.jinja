@@ -2,6 +2,10 @@
 
 {% block content %}
 
+<div id="friend-requests-container">
+  <!-- Friend requests will be displayed here -->
+</div>
+
 <h2>Friends List</h2>
 <table id="friends-list" style="border: 1px solid black">
   <tr>
@@ -15,53 +19,100 @@
 </table>
 
 <h2>Add a New Friend</h2>
-<form id="friend_form">
+<form id="friend-form">
   <label for="enter_value">Friend's Username:</label><br>
   <input type="text" id="enter_value" name="enter_value">
   <input type="submit" value="Submit">
 </form>
 
-<h2>Friend requests sent</h2>
-<ul id="requests-sent-list"></ul>
-
-<h2>Friend requests received</h2>
-<ul id="requests-received-list"></ul>
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul>
+    {% for message in messages %}
+      <li>{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
 
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const friendForm = document.getElementById('friend_form');
-        friendForm.addEventListener('submit', function(event) {
-            event.preventDefault();
-            const friendUsername = document.getElementById('enter_value').value;
-            const senderUsername = '{{ username }}';
+document.addEventListener("DOMContentLoaded", function() {
+    function fetchAndDisplayFriendRequests() {
+        fetch("{{ url_for('fetch_friend_requests') }}")
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.requests) {
+                const requestsContainer = document.getElementById('friend-requests-container');
+                data.requests.forEach(request => {
+                    const requestElement = document.createElement('div');
+                    requestElement.textContent = request.fromUser;
+                    const acceptButton = document.createElement('button');
+                    acceptButton.textContent = 'Accept';
+                    acceptButton.addEventListener('click', function() {
+                        const acceptUrl = `/accept-friend-request/${request.id}`;
+                        fetch(acceptUrl, { method: 'POST' })
+                        .then(response => response.json())
+                        .then(data => {
+                            alert(data.message);
+                            requestElement.remove();
+                        })
+                        .catch(error => console.error('Error:', error));
+                    });
+                    const declineButton = document.createElement('button');
+                    declineButton.textContent = 'Decline';
+                    declineButton.addEventListener('click', function() {
+                        const declineUrl = `/reject-friend-request/${request.id}`;
+                        fetch(declineUrl, { method: 'POST' })
+                        .then(response => response.json())
+                        .then(data => {
+                            alert(data.message);
+                            requestElement.remove();
+                        })
+                        .catch(error => console.error('Error:', error));
+                    });
+                    requestElement.appendChild(acceptButton);
+                    requestElement.appendChild(declineButton);
+                    requestsContainer.appendChild(requestElement);
+                });
+            } else {
+                console.log('No friend requests found.');
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
 
-            const requestsSent = document.getElementById('requests-sent-list')
-            requestsSent.innerHTML = '';
-            const friend_in_list = document.createElement('li')
-            friend_in_list.textContent = friendUsername
-            requestsSent.appendChild(friend_in_list)
+    fetchAndDisplayFriendRequests();
 
-            const server_data = {
-                "sender": senderUsername,
-                "receiver": friendUsername
-            };
-            $.ajax({
-                url: '/home/send_fr',
-                data: JSON.stringify(server_data),
-                contentType: 'application/json',
-                dataType: 'json',
-                type: 'POST',
-                success: function(response) {
-                    console.log(response);
-                },
-                error: function(error) {
-                    console.log(error);
-                }
-            });
-
-        });
+    const friendForm = document.getElementById('friend-form');
+    friendForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        const friendUsername = document.getElementById('enter_value').value;
+        fetch("/home/send_fr", {  // 确保路由匹配 Flask 中定义的路由
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ sender: "{{ username }}", receiver: friendUsername }) // 确保用户名替换正确
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            if (data.success) {
+                const friendsList = document.getElementById('friends-list');
+                const newRow = friendsList.insertRow();
+                newRow.innerHTML = `<td>${friendUsername}</td>`;
+            }
+        })
+        .catch(error => console.error('Error:', error));
     });
+});
 </script>
+
+{% endblock %}
+
 
 
 {% endblock %}
+
+
+
