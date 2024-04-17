@@ -93,16 +93,3 @@ def get_friends_list(username: str):
                 friend_usernames.append(friend.person1)
 
         return friend_usernames
-
-
-def are_already_friends_or_pending(sender_username: str, receiver_username: str):
-    with Session(engine) as session:
-        request = session.query(Friends).filter(
-            Friends.person1.in_([sender_username, receiver_username]),
-            Friends.person2.in_([sender_username, receiver_username]),
-            Friends.status.in_([FriendshipStatus.PENDING, FriendshipStatus.ACCEPTED])
-        ).first()
-        return request is not None
-
-
-

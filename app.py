@@ -13,7 +13,6 @@ import cherrypy
 from models import User, Friends, FriendshipStatus
 from hashlib import sha256
 
-
 import logging
 
 # this turns off Flask Logging, uncomment this to turn off Logging
@@ -138,7 +137,7 @@ def fetch_friend_requests():
     
     return jsonify({"requests": requests_data}), 200
 
-@app.route("/home/send_fr", methods=['POST'])
+@app.route("/home/send_fr")
 def send_friend_request():
     print(request.data)
 
@@ -176,6 +175,14 @@ def reject_friend_request(request_id):
         return jsonify({"message": "Could not reject friend request"}), 500
 
 
+
+def are_already_friends_or_pending(user1, user2):
+    existing = db.get_received_friend_requests(user2)
+    for request in existing:
+        if (request.person1 == user1 or request.person2 == user1) and \
+           (request.status == FriendshipStatus.PENDING or request.status == FriendshipStatus.ACCEPTED):
+            return True
+    return False
 
 def search_friend(friend):
     user_list = db.get_all_user()  # Update to fetch user list dynamically
