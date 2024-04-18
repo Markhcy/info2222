@@ -126,6 +126,8 @@ def fetch_friend_requests():
     return jsonify({"requests": requests_data}), 200
 
 
+
+
 @app.route('/home/send_fr', methods=['POST'])
 def send_friend_request():
     if not request.is_json:
@@ -141,14 +143,16 @@ def send_friend_request():
     try:
         if are_already_friends_or_pending(sender_username, receiver_username):
             return jsonify({"message": "Already friends or request pending"}), 409
-        # print(sender_username, receiver_username)
+
         success = db.add_friend_request(sender_username, receiver_username)
         if success:
             return jsonify({"message": "Friend request sent"}), 200
         else:
-            return jsonify({"message": "Receiver does not exist"}), 404  
+            return jsonify({"message": "Receiver does not exist"}), 404
+        
     except Exception as e:
         return jsonify({"message": f"Internal server error: {str(e)}"}), 500
+
 
 
 @app.route('/accept-friend-request/<int:request_id>', methods=['POST'])
