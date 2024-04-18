@@ -197,4 +197,4 @@ def xss_prevention(string):
     return string
 
 if __name__ == '__main__':
-    socketio.run(app)
+    app.run(ssl_context=("./certs/localhost.crt", "./certs/localhost.key"))
