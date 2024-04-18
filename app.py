@@ -104,6 +104,13 @@ def home():
     friends_list = db.get_friends_list(username)
     return render_template("friends.jinja", username=username, users=user_list, friends_list=friends_list)
 
+
+# Room page when a user wants to chat with a friend
+@app.route("/room", methods=['GET', 'POST'])
+def room():
+    username = request.args.get("username")
+    return render_template("room.jinja", username=username)
+
 @app.route('/home/fetch_friend_requests', methods=['GET'])
 def fetch_friend_requests():
     # username = session.get("username")

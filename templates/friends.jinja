@@ -9,7 +9,7 @@
   </tr>
   {% for friend in friends_list %}
     <tr>
-      <td style="border: 1px solid black">{{ friend }}</td>
+      <td style="border: 1px solid black"><a href=room?username={{ username }}&friend={{ friend }}>{{ friend }}</a></td>
     </tr>
   {% endfor %}
 </table>
@@ -20,8 +20,6 @@
   <input type="text" id="enter_value" name="enter_value">
   <input type="submit" value="Submit">
 </form>
-
-// A user's friend requests will pop up here
 
 <h2>Friend requests received</h2>
 <ul id="requests-received-list"></ul>
