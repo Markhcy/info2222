@@ -21,6 +21,8 @@
   <input type="submit" value="Submit">
 </form>
 
+// A user's friend requests will pop up here
+
 <h2>Friend requests received</h2>
 <ul id="requests-received-list"></ul>
 
@@ -76,12 +78,12 @@
           if (accept) {
             const senderUsername = '{{ username }}';
             $.ajax({
-              url: '/friends',
+              url: '/home',
               data: { "username": senderUsername },
               type: 'GET',
               success: function(res) {
                 //console.log({{friends_list}})
-                window.open("/friends?username={{ username }}")
+                window.location.href = "/home?username={{ username }}"
               }
             })
           }
@@ -110,9 +112,11 @@
         type: 'POST',
         success: function(response) {
           console.log(response);
+          alert("Friend request sent!")
         },
         error: function(error) {
           console.log(error);
+          alert("Unable to send friend request!")
         }
       });
     });

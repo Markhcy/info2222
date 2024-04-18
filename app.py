@@ -41,18 +41,6 @@ def index():
 def login():    
     return render_template("login.jinja")
 
-@app.route("/friends")
-def friends():
-    username = request.args.get("username")
-    if not username:
-        flash("Username is required to view friends.")
-        return redirect(url_for('login'))
-
-    friends_list = db.get_friends_list(username)
-    print(friends_list)
-    return render_template("friends.jinja", friends_list=friends_list, username=username)
-
-
 @app.route("/login/user", methods=["POST"])
 def login_user():
     if not request.is_json:
@@ -102,9 +90,9 @@ def signup_user():
 def page_not_found(_):
     return render_template('404.jinja'), 404
 
-# friends page, the initial landing page after logging in.
-user_list = db.get_all_user()
 
+user_list = db.get_all_user()
+# Home page (friends_list page), the initial landing page after logging in.
 @app.route("/home", methods=['GET', 'POST'])
 def home():
     username = request.args.get("username")
