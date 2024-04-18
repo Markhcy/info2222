@@ -47,12 +47,10 @@ def friends():
     if not username:
         flash("Username is required to view friends.")
         return redirect(url_for('login'))
-    
-    raw_friends_list = db.get_friends_list(username)
-    friends_list = [friend for friend in raw_friends_list if friend] 
-    # print(friends_list)
+
+    friends_list = db.get_friends_list(username)
+    print(friends_list)
     return render_template("friends.jinja", friends_list=friends_list, username=username)
-    # return url_for("friends", friends_list=friends_list, username=username)
 
 
 @app.route("/login/user", methods=["POST"])
@@ -111,23 +109,12 @@ user_list = db.get_all_user()
 def home():
     username = request.args.get("username")
     if not username:
-        abort(404)
-    
+        flash("Username is required to view friends.")
+        return redirect(url_for('login'))
+
     user_list = db.get_all_user()
     friends_list = db.get_friends_list(username)
-
-    # if request.method == 'POST':
-    #     friend_name = request.form.get("enter_value")
-    #     if db.get_user(friend_name):
-    #         if not db.are_already_friends_or_pending(username, friend_name):
-    #             db.add_friend_request(username, friend_name)
-    #             flash("Friend request sent!")
-    #         else:
-    #             flash("You are already friends or a friend request is pending.")
-    #     else:
-    #         flash("Friend does not exist!")
-
-    return render_template("friends.jinja", username=username, users=user_list, friends=friends_list)
+    return render_template("friends.jinja", username=username, users=user_list, friends_list=friends_list)
 
 @app.route('/home/fetch_friend_requests', methods=['GET'])
 def fetch_friend_requests():

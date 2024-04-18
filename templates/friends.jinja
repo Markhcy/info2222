@@ -21,9 +21,6 @@
   <input type="submit" value="Submit">
 </form>
 
-<h2>Friend requests sent</h2>
-<ul id="requests-sent-list"></ul>
-
 <h2>Friend requests received</h2>
 <ul id="requests-received-list"></ul>
 
@@ -70,42 +67,40 @@
   }
 
   function handleFriendRequest(fromUser, received_id, accept) {
-  const url = (accept ? '/accept-friend-request/' : '/reject-friend-request/') + received_id;
-  $.ajax({
-    url: url,
-    type: 'POST',
-    success: function(response) {
-      console.log(accept ? 'Friend request accepted' : 'Friend request rejected', response);
-      if (accept) {
-        const senderUsername = '{{ username }}';
-        $.ajax({
-          url: '/friends',
-          data: { "username": senderUsername },
-          type: 'GET',
-          success: function(res) {
-            //console.log({{friends_list}})
-            window.open("/friends?username={{ username }}")
+      const url = (accept ? '/accept-friend-request/' : '/reject-friend-request/') + received_id;
+      $.ajax({
+        url: url,
+        type: 'POST',
+        success: function(response) {
+          console.log(accept ? 'Friend request accepted' : 'Friend request rejected', response);
+          if (accept) {
+            const senderUsername = '{{ username }}';
+            $.ajax({
+              url: '/friends',
+              data: { "username": senderUsername },
+              type: 'GET',
+              success: function(res) {
+                //console.log({{friends_list}})
+                window.open("/friends?username={{ username }}")
+              }
+            })
           }
-        })
-      }
-    },
-    error: function(error) {
-      console.log('Error handling friend request', error);
+        },
+        error: function(error) {
+          console.log('Error handling friend request', error);
+        }
+      });
     }
-  });
-}
 
   document.addEventListener("DOMContentLoaded", function() {
+    flush_received();
+
     const friendForm = document.getElementById('friend_form');
     friendForm.addEventListener('submit', function(event) {
       event.preventDefault();
       const friendUsername = document.getElementById('enter_value').value;
       const senderUsername = '{{ username }}';
-      const requestsSent = document.getElementById('requests-sent-list');
-      requestsSent.innerHTML = '';
-      const friendInList = document.createElement('li');
-      friendInList.textContent = friendUsername;
-      requestsSent.appendChild(friendInList);
+
       const serverData = { "sender": senderUsername, "receiver": friendUsername };
       $.ajax({
         url: '/home/send_fr',
@@ -123,6 +118,9 @@
     });
 
     var t1 = window.setInterval(flush_received, 1000 * 5);
+
+
+
   });
 </script>
 
