@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 
+
 import logging
 
 # this turns off Flask Logging, uncomment this to turn off Logging
@@ -303,8 +304,6 @@ def insert_offline_message(sender_username, receiver_username, message):
         return False
 
 
-
-
 @app.route('/send_message', methods=['POST'])
 def send_message():
     data = request.get_json()
@@ -339,17 +338,40 @@ def send_message():
         return jsonify({"message": "Message sent successfully", "tag": urlsafe_b64encode(tag).decode(), "salt": salt}), 200
     
 
-@app.route('/get_offline_messages', methods=['GET'])
+@app.route('/get_offline_messages', methods=['POST'])
 def get_offline_messages():
+    data = request.json
     username = session.get('user')
+    password = data.get('password')
+
     if not username:
         return jsonify({'error': 'User not authenticated'}), 401
 
-    messages = db.get_encrypted_messages(username)
-    messages_formatted = [{'text': msg.encrypted_text, 'sender': msg.sender_username} for msg in messages] 
-    return jsonify({'messages': messages_formatted}), 200
+    user = db.get_user(username)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
 
+ 
+    salted_password = password + user.salt
+    hashed_password = sha256(salted_password.encode('utf-8')).hexdigest()
 
+    if hashed_password != user.password:
+        return jsonify({'error': 'Incorrect password'}), 403 
+
+    try:
+        encrypted_messages = db.get_encrypted_messages(username)
+        decrypted_messages = []
+        for msg in encrypted_messages:
+            salt = urlsafe_b64decode(msg.encryption_salt.encode())
+            key = get_kdf(salt).derive(password.encode()) 
+            tag = urlsafe_b64decode(msg.encryption_tag)
+            encrypted_text = urlsafe_b64decode(msg.encrypted_text)
+            decrypted_text = decrypt_message(key, tag, encrypted_text)
+            decrypted_messages.append({'text': decrypted_text.decode('utf-8'), 'sender': msg.sender_username})
+        return jsonify({'messages': decrypted_messages}), 200
+    except Exception as e:
+       ##return jsonify({'error': 'Failed to decrypt messages', 'details': str(e)}), 500
+       return None
 
 if __name__ == '__main__':
     app.run(ssl_context=("./certs/localhost.crt", "./certs/localhost.key"))

@@ -101,22 +101,19 @@
     })
 
     $(document).ready(function() {
-    if (Cookies.get("room_id") == undefined) {
-        console.log("No room joined.");
-        return;
-    }
+        if (Cookies.get("room_id") === undefined) {
+            console.log("No room joined.");
+            window.location.href = '/friends'; 
+            return;
+        }
 
-    room_id = parseInt(Cookies.get("room_id"));
-    $("#chat_box").hide();
-    $("#input_box").show();
-    fetchOfflineMessages(); 
-});
+        room_id = parseInt(Cookies.get("room_id"));
+        $("#chat_box").hide();
+        $("#input_box").show();
 
-  
+        requestPasswordAndFetchMessages(); 
+    });
 
-        
-
-    
     // Here's the Socket IO part of the code
     // things get a bit complicated here so brace yourselves :P
     let username = "{{ username }}";
@@ -227,36 +224,49 @@
     });
 }
 
-    function fetchOfflineMessages() {
-        $.ajax({
-            url: '/get_offline_messages',
-            type: 'GET',
-            success: function(response) {
-                console.log("Received offline messages:", response);
-                if (response.messages && response.messages.length > 0) {
-                    response.messages.forEach(function(message) {
-                        addMessageToUI(message.text, message.sender);
-                    });
-                } else {
-                    console.log("No offline messages.");
-                }
-            },
-            error: function(error) {
-                console.error("Error fetching offline messages:", error);
-            }
-        });
+function requestPasswordAndFetchMessages() {
+    let password = prompt("Please enter your password to decrypt messages:");
+    if (password === null) {
+        // 用户点击了取消，重定向到好友列表页面
+        window.location.href = '/friends';
+        return;
     }
+    if (password === "") {
+        alert("Password is required!");
+        requestPasswordAndFetchMessages();
+        return;
+    }
+
+    $.ajax({
+        url: '/get_offline_messages',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({password: password}),
+        success: function(response) {
+            if (response.messages && response.messages.length > 0) {
+                response.messages.forEach(function(message) {
+                    addMessageToUI(message.text, message.sender);
+                });
+            } else {
+                console.log("No offline messages.");
+            }
+        },
+        error: function(xhr) {
+            let error = JSON.parse(xhr.responseText);
+            alert("Error: " + error.error);
+            requestPasswordAndFetchMessages(); 
+        }
+    });
+}
+
 
 
     function addMessageToUI(message, sender) {
-        if (!message || !sender) {
-            console.log("Invalid message or sender:", message, sender);
-            return;
-        }
         let box = $("#message_box");
         let messageElement = $('<p></p>').text(`${sender}: ${message}`);
         box.append(messageElement);
     }
+
 
     
 </script>
