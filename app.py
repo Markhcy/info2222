@@ -8,10 +8,9 @@ from flask import Flask, render_template, request, abort, url_for, redirect, fla
 from flask_socketio import SocketIO
 import db
 import secrets
-from jinja2 import utils
-import cherrypy
 from models import User, Friends, FriendshipStatus
 from hashlib import sha256
+import bcrypt
 
 import logging
 
@@ -31,34 +30,10 @@ socketio = SocketIO(app)
 import socket_routes
 
 
-# index page
+# index page (initial landing page)
 @app.route("/")
 def index():
     return render_template("index.jinja")
-
-# login page
-@app.route("/login")
-def login():    
-    return render_template("login.jinja")
-
-@app.route("/login/user", methods=["POST"])
-def login_user():
-    if not request.is_json:
-        abort(404)
-
-    username = request.json.get("username")
-    password = request.json.get("password")
-    hashedPassword = (sha256(password.encode('utf-8')).hexdigest())
-
-
-    user =  db.get_user(username)
-    if user is None:
-        return "Error: User does not exist!"
-
-    if user.password != hashedPassword:
-        return "Error: Password does not match!"
-
-    return url_for('home', username=request.json.get("username"))
 
 # handles a get request to the signup page
 @app.route("/signup")
@@ -70,32 +45,81 @@ def signup():
 def signup_user():
     if not request.is_json:
         abort(404)
-    # XSS prevention by sanitising on server-side using built-in Jinja function
+    # XSS prevention by sanitising on server-side
     username = request.json.get("username")
     password = request.json.get("password")
     username = xss_prevention(username)
     password = xss_prevention(password)
 
-    # SHA256 hashing of password on server-side
-    hashedPassword = (sha256(password.encode('utf-8')).hexdigest())
+    # generate a salt (random string), concatenate the plaintext password with the salt
+    salt = secrets.token_hex(8)
+    salted_password = password + salt
 
+    # SHA256 hashing of the salted password on server-side
+    hashed_password = sha256(salted_password.encode('utf-8')).hexdigest()
 
     if db.get_user(username) is None:
-        db.insert_user(username, hashedPassword)
+        db.insert_user(username, hashed_password, salt)
         return url_for('login', username=username)
     return "Error: User already exists!"
+
+# login page
+@app.route("/login")
+def login():    
+    return render_template("login.jinja")
+
+@app.route("/login/user", methods=["POST"])
+def login_user():
+    if not request.is_json:
+        abort(404)
+
+    # XSS prevention by sanitising on server-side
+    username = request.json.get("username")
+    password = request.json.get("password")
+    username = xss_prevention(username)
+    password = xss_prevention(password)
+
+    # hash the password with sha256
+    password_in_db = db.get_user(username).password
+    salt_in_db = db.get_user(username).salt
+    salted_password = password + salt_in_db
+
+    # SHA256 hashing of the salted password on server-side
+    hashed_password = sha256(salted_password.encode('utf-8')).hexdigest()
+
+    user =  db.get_user(username)
+    if user is None:
+        return "Error: User does not exist!"
+
+    if hashed_password != password_in_db:
+        return "Error: Password does not match!"
+
+    # session handling
+    session["user"] = username
+
+    return url_for('home', username=request.json.get("username"))
 
 # handler when a "404" error happens
 @app.errorhandler(404)
 def page_not_found(_):
     return render_template('404.jinja'), 404
 
-
 user_list = db.get_all_user()
+
 # Home page (friends_list page), the initial landing page after logging in.
 @app.route("/home", methods=['GET', 'POST'])
 def home():
     username = request.args.get("username")
+    # verify that the user is in current session
+    if "user" in session:
+        user = session["user"]
+        if user != username:
+            # if user is trying to access a webpage not native to their session
+            abort(404)
+    else:
+        # if user is not in session, they should login first
+        return redirect(url_for("login"))
+
     if not username:
         flash("Username is required to view friends.")
         return redirect(url_for('login'))
@@ -109,7 +133,8 @@ def home():
 @app.route("/room", methods=['GET', 'POST'])
 def room():
     username = request.args.get("username")
-    return render_template("room.jinja", username=username)
+    friend = request.args.get('friend')
+    return render_template("room.jinja", username=username, friend = friend)
 
 @app.route('/home/fetch_friend_requests', methods=['GET'])
 def fetch_friend_requests():
@@ -124,8 +149,6 @@ def fetch_friend_requests():
     requests_data = [{'fromUser': req.person1, 'id': req.connection_id} for req in friend_requests]
     
     return jsonify({"requests": requests_data}), 200
-
-
 
 
 @app.route('/home/send_fr', methods=['POST'])
@@ -152,7 +175,6 @@ def send_friend_request():
         
     except Exception as e:
         return jsonify({"message": f"Internal server error: {str(e)}"}), 500
-
 
 
 @app.route('/accept-friend-request/<int:request_id>', methods=['POST'])

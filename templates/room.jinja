@@ -61,6 +61,27 @@
 
 <script src="/static/js/libs/socket.io.min.js"></script>
 <script>
+
+    // method to generate ECDH key pair
+
+    async function generateECDHKeyPair(room_id){
+        let keyPair = await window.crypto.subtle.generateKey(
+          {
+            name: "ECDH",
+            namedCurve: "P-384",
+          },
+          false,
+          ["deriveKey"]
+        );
+        const publicKey = await crypto.subtle.exportKey("spki", keyPair.publicKey);
+        socket.emit("send_key", publicKey, room_id);
+        socket.on("receive-key", exchanged_key => {
+            const formatted_key = btoa(String.fromCharCode(...new Uint8Array(exchanged_key)))
+            console.log(formatted_key);
+    })
+
+    }
+
     let room_id = 0;
 
     // when the user presses the "Enter" key inside of the "message box", 
@@ -79,7 +100,6 @@
         }
     })
 
-
     $(document).ready(() => {
         // room_id is undefined if the user hasn't joined a room
         // we early return in this case
@@ -92,6 +112,7 @@
         $("#chat_box").hide();
         $("#input_box").show();
         room_id = parseInt(Cookies.get("room_id"));
+
     })
     
     // Here's the Socket IO part of the code
@@ -103,6 +124,23 @@
     // initializes the socket
     const socket = io();
 
+    function checkIfRoomIsReady() {
+        socket.emit('is_room_ready');
+    }
+    let roomReadyCheck = setInterval(checkIfRoomIsReady, 5000);
+
+    // when room is ready, generate a public-private key pair with ECDH and send
+    // the public key to the server to exchange with other user
+    socket.on("room_is_ready", msg => {
+        clearInterval(roomReadyCheck);
+        console.log(msg);
+        generateECDHKeyPair(room_id);
+    })
+
+
+
+    join_room()
+
     // an incoming message arrives, we'll add the message to the message box
     socket.on("incoming", (msg, color="black") => {
         add_message(msg, color);
@@ -110,16 +148,16 @@
     
     // we'll send the message to the server by emitting a "send" event
     function send() {
+
         let message = $("#message").val();
         $("#message").val("");
-        socket.emit("send", username, message, room_id);  
+        socket.emit("send", username, message, room_id);
     } 
 
     // we emit a join room event to the server to join a room
     function join_room() {
-       
-        let receiver = $("#receiver").val();
 
+        let receiver = "{{ friend }}";
         // pass in the receiver of our message to the server
         // as well as the current user's username
         socket.emit("join", username, receiver, (res) => {
@@ -133,10 +171,10 @@
             // set the room id variable to the room id returned by the server
             room_id = res;
             Cookies.set("room_id", room_id);
-
             // now we'll show the input box, so the user can input their message
             $("#chat_box").hide();
             $("#input_box").show();
+            // socket.emit("is_room_ready")
         });
      
     }

@@ -15,6 +15,10 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 import enum
 from typing import Dict
+from cryptography.hazmat.primitives.asymmetric import dh
+import sympy
+import random
+
 
 Base = declarative_base()
 
@@ -27,6 +31,7 @@ class User(Base):
     __tablename__ = "user"
     username = Column(String, primary_key=True)
     password = Column(String)
+    salt = Column(String)
     sent_requests = relationship("Friends", foreign_keys="[Friends.person1]", back_populates="requester")
     received_requests = relationship("Friends", foreign_keys="[Friends.person2]", back_populates="receiver")
 
@@ -59,6 +64,7 @@ class Room():
         # for example self.dict["John"] -> gives you the room id of 
         # the room where John is in
         self.dict: Dict[str, int] = {}
+        self.num_members = 0
 
     def create_room(self, sender: str, receiver: str) -> int:
         room_id = self.counter.get()
@@ -68,6 +74,7 @@ class Room():
     
     def join_room(self,  sender: str, room_id: int) -> int:
         self.dict[sender] = room_id
+
 
     def leave_room(self, user):
         if user not in self.dict.keys():
@@ -79,4 +86,6 @@ class Room():
         if user not in self.dict.keys():
             return None
         return self.dict[user]
-    
+
+    def get_num_members(self):
+        return self.num_members
