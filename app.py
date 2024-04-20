@@ -5,12 +5,24 @@ the socket event handlers are inside of socket_routes.py
 '''
 
 from flask import Flask, render_template, request, abort, url_for, redirect, flash, jsonify,session
+from flask_bcrypt import Bcrypt
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from base64 import urlsafe_b64encode, urlsafe_b64decode
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from flask_socketio import SocketIO
 import db
 import secrets
-from models import User, Friends, FriendshipStatus
+from models import User, Friends, FriendshipStatus,EncryptedMessage
 from hashlib import sha256
-import bcrypt
+from sqlalchemy.orm import Session
+from sqlalchemy import create_engine
+from sqlalchemy.exc import SQLAlchemyError
 
 import logging
 
@@ -25,6 +37,9 @@ app = Flask(__name__)
 # secret key used to sign the session cookie
 app.config['SECRET_KEY'] = secrets.token_hex()
 socketio = SocketIO(app)
+bcrypt = Bcrypt(app)
+engine = create_engine('sqlite:///main.db', echo=True)
+
 
 # don't remove this!!
 import socket_routes
@@ -222,5 +237,121 @@ def xss_prevention(string):
         string = string.replace(char, "")
     return string
 
+
+def get_kdf(salt):
+    return PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+        backend=default_backend()
+    )
+
+def encrypt_message(key, plaintext):
+    cipher = Cipher(algorithms.AES(key), modes.GCM())
+    encryptor = cipher.encryptor()
+    encrypted_text = encryptor.update(plaintext.encode()) + encryptor.finalize()
+    return encrypted_text, encryptor.tag
+
+
+def decrypt_message(key, tag, encrypted_text):
+    cipher = Cipher(algorithms.AES(key), modes.GCM(tag))
+    decryptor = cipher.decryptor()
+    return decryptor.update(encrypted_text) + decryptor.finalize()
+
+@app.route('/encrypt', methods=['POST'])
+def encrypt():
+    data = request.json
+    password = data['password']
+    plaintext = data['plaintext']
+    
+
+    salt = bcrypt.gensalt()
+    key = get_kdf(salt).derive(password.encode())
+    
+
+    encrypted_text, tag = encrypt_message(key, plaintext)
+    
+
+    return jsonify({
+        'encrypted': urlsafe_b64encode(encrypted_text).decode(),
+        'tag': urlsafe_b64encode(tag).decode(),
+        'salt': urlsafe_b64encode(salt).decode()
+    })
+
+
+online_users = {}
+
+def is_receiver_online(receiver_username):
+    return online_users.get(receiver_username, False)
+
+def insert_offline_message(sender_username, receiver_username, message):
+    try:
+        with Session(engine) as session:
+            encrypted_message = EncryptedMessage(
+                sender_username=sender_username,
+                receiver_username=receiver_username,
+                encrypted_text=message,  
+                is_offline=True 
+            )
+            session.add(encrypted_message)
+            session.commit()
+            print("Offline message stored successfully.")
+            return True
+    except SQLAlchemyError as e:
+        print(f"Database error: {e}")
+        return False
+
+
+
+
+@app.route('/send_message', methods=['POST'])
+def send_message():
+    data = request.get_json()
+    username = data['username']
+    password = data['password']
+    plaintext = data['message']
+    receiver = data['receiver']
+
+    user = db.get_user(username)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    salted_password = password + user.salt
+    hashed_password = sha256(salted_password.encode('utf-8')).hexdigest()
+    
+    if hashed_password != user.password:
+        return jsonify({"error": "Authentication failed"}), 403
+
+    if not is_receiver_online(receiver):
+
+        success = db.insert_offline_message(username, receiver, plaintext)
+        if success:
+            return jsonify({"message": "Message stored for later delivery"}), 200
+        else:
+            return jsonify({"error": "Failed to store message"}), 500
+    else:
+
+        salt = secrets.token_hex(16)  
+        key = get_kdf(salt.encode()).derive(password.encode())
+        encrypted_message, tag = encrypt_message(key[:32], plaintext)  
+        db.insert_encrypted_message(username, receiver, encrypted_message, tag, salt)
+        return jsonify({"message": "Message sent successfully", "tag": urlsafe_b64encode(tag).decode(), "salt": salt}), 200
+    
+
+@app.route('/get_offline_messages', methods=['GET'])
+def get_offline_messages():
+    username = session.get('user')
+    if not username:
+        return jsonify({'error': 'User not authenticated'}), 401
+
+    messages = db.get_encrypted_messages(username)
+    messages_formatted = [{'text': msg.encrypted_text, 'sender': msg.sender_username} for msg in messages] 
+    return jsonify({'messages': messages_formatted}), 200
+
+
+
 if __name__ == '__main__':
     app.run(ssl_context=("./certs/localhost.crt", "./certs/localhost.key"))
+
+

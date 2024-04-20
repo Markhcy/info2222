@@ -100,20 +100,22 @@
         }
     })
 
-    $(document).ready(() => {
-        // room_id is undefined if the user hasn't joined a room
-        // we early return in this case
-        if (Cookies.get("room_id") == undefined) {
-            return;
-        }
+    $(document).ready(function() {
+    if (Cookies.get("room_id") == undefined) {
+        console.log("No room joined.");
+        return;
+    }
 
-        // the user has already joined an existing room
-        // we'll display the message box, instead of the "Chat with: " box
-        $("#chat_box").hide();
-        $("#input_box").show();
-        room_id = parseInt(Cookies.get("room_id"));
+    room_id = parseInt(Cookies.get("room_id"));
+    $("#chat_box").hide();
+    $("#input_box").show();
+    fetchOfflineMessages(); 
+});
 
-    })
+  
+
+        
+
     
     // Here's the Socket IO part of the code
     // things get a bit complicated here so brace yourselves :P
@@ -195,6 +197,67 @@
         let child = $(`<p style="color:${color}; margin: 0px;"></p>`).text(message);
         box.append(child);
     }
+
+    function sendEncryptedMessage() {
+    let message = $("#message").val();
+    let receiver = $("#receiver").val();
+    $("#message").val(""); 
+
+
+    let password = prompt("Please enter your password to encrypt the message:");
+
+    $.ajax({
+        url: '/encrypt',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            'username': "{{ username }}",
+            'password': password,
+            'plaintext': message,
+            'receiver': receiver
+        }),
+        success: function(response) {
+            console.log("Encrypted message sent successfully");
+            addMessageToUI(message, "You");
+        },
+        error: function(error) {
+            console.error("Error sending encrypted message: ", error);
+            alert("Failed to send encrypted message.");
+        }
+    });
+}
+
+    function fetchOfflineMessages() {
+        $.ajax({
+            url: '/get_offline_messages',
+            type: 'GET',
+            success: function(response) {
+                console.log("Received offline messages:", response);
+                if (response.messages && response.messages.length > 0) {
+                    response.messages.forEach(function(message) {
+                        addMessageToUI(message.text, message.sender);
+                    });
+                } else {
+                    console.log("No offline messages.");
+                }
+            },
+            error: function(error) {
+                console.error("Error fetching offline messages:", error);
+            }
+        });
+    }
+
+
+    function addMessageToUI(message, sender) {
+        if (!message || !sender) {
+            console.log("Invalid message or sender:", message, sender);
+            return;
+        }
+        let box = $("#message_box");
+        let messageElement = $('<p></p>').text(`${sender}: ${message}`);
+        box.append(messageElement);
+    }
+
     
 </script>
 {% endblock %}

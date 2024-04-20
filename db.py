@@ -5,7 +5,7 @@ database file, containing all the logic to interface with the sql database
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from models import Base, User, Friends, FriendshipStatus
+from models import Base, User, Friends, FriendshipStatus,EncryptedMessage
 from sqlalchemy.exc import SQLAlchemyError
 
 from pathlib import Path
@@ -99,3 +99,27 @@ def get_friends_list(username: str):
 
         return friend_usernames
     
+def insert_encrypted_message(sender_username: str, receiver_username: str, encrypted_text: bytes, tag: str, salt: str):
+    try:
+        with Session(engine) as session:
+            encrypted_message = EncryptedMessage(
+                sender_username=sender_username,
+                receiver_username=receiver_username,
+                encrypted_text=encrypted_text,
+                encryption_tag=tag,
+                encryption_salt=salt
+            )
+            session.add(encrypted_message)
+            session.commit()
+            return True
+    except SQLAlchemyError as e:
+        print(f"Database error: {e}")
+        return False
+
+def get_encrypted_messages(username: str):
+    with Session(engine) as session:
+        # Retrieves messages sent by the user
+        sent_messages = session.query(EncryptedMessage).filter_by(sender_username=username).all()
+        # Retrieves messages received by the user
+        received_messages = session.query(EncryptedMessage).filter_by(receiver_username=username).all()
+        return sent_messages, received_messages

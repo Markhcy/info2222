@@ -10,7 +10,7 @@ Prisma docs also looks so much better in comparison
 or use SQLite, if you're not into fancy ORMs (but be mindful of Injection attacks :) )
 '''
 
-from sqlalchemy import Column, String, Integer, ForeignKey, Enum
+from sqlalchemy import Column, String, Integer, ForeignKey, Enum, LargeBinary
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 import enum
@@ -44,6 +44,20 @@ class Friends(Base):
 
     requester = relationship("User", foreign_keys=[person1], back_populates="sent_requests")
     receiver = relationship("User", foreign_keys=[person2], back_populates="received_requests")
+
+
+class EncryptedMessage(Base):
+    __tablename__ = 'encrypted_messages'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    sender_username = Column(String, ForeignKey('user.username'))
+    receiver_username = Column(String, ForeignKey('user.username'))
+    encrypted_text = Column(LargeBinary)
+    encryption_tag = Column(String)
+    encryption_salt = Column(String)
+
+    sender = relationship("User", foreign_keys=[sender_username], backref="sent_encrypted_messages")
+    receiver = relationship("User", foreign_keys=[receiver_username], backref="received_encrypted_messages")
+
 
 
 
